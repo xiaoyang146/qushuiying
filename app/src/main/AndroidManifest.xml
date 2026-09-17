@@ -14,7 +14,7 @@
     <application
         android:name=".App"
         android:allowBackup="false"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@drawable/ic_launcher_foreground"
         android:label="头大i去水印"
         android:theme="@style/Theme.WatermarkRemover"
         android:usesCleartextTraffic="false"
