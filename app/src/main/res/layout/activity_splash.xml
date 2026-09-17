@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:background="#FFFFFF">
+
+    <!-- 图标+文字区域（垂直居中） -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:orientation="vertical">
+
+        <!-- 应用图标 -->
+        <ImageView
+            android:id="@+id/ivAppIcon"
+            android:layout_width="104dp"
+            android:layout_height="104dp"
+            android:src="@mipmap/ic_launcher"
+            android:alpha="0.0" />
+
+        <!-- 应用名称 -->
+        <TextView
+            android:id="@+id/tvAppName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="头大i去水印"
+            android:textSize="30sp"
+            android:textColor="#1C1E21"
+            android:textStyle="bold"
+            android:layout_marginTop="26dp"
+            android:alpha="0.0" />
+
+        <!-- 主标语 -->
+        <TextView
+            android:id="@+id/tvTagline"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="简约 · 专业 · 高效"
+            android:textSize="15sp"
+            android:textColor="#606770"
+            android:letterSpacing="0.12"
+            android:layout_marginTop="10dp"
+            android:alpha="0.0" />
+
+        <!-- 副标语 -->
+        <TextView
+            android:id="@+id/tvSubTagline"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="一键解析无水印短视频"
+            android:textSize="13sp"
+            android:textColor="#888C92"
+            android:layout_marginTop="4dp"
+            android:alpha="0.0" />
+    </LinearLayout>
+
+    <!-- 版本号（底部） -->
+    <TextView
+        android:id="@+id/tvVersion"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textSize="14sp"
+        android:textColor="#BEC3C9"
+        android:layout_marginBottom="86dp"
+        android:alpha="0.0" />
+
+</LinearLayout>

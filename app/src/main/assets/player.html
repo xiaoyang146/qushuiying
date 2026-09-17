@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>HTML5 播放器</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { width: 100%; height: 100%; background: #000; overflow: hidden; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; user-select: none; }
+  #wrap { position: relative; width: 100%; height: 100%; background: #000; border-radius: 28px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+  #video { width: 100%; height: 100%; object-fit: contain; background: #000; border-radius: 28px; }
+  /* 缓冲转圈 */
+  #spinner { position: absolute; top: 50%; left: 50%; width: 42px; height: 42px; margin: -21px 0 0 -21px; border: 3px solid rgba(255,255,255,.25); border-top-color: #fff; border-radius: 50%; animation: spin .9s linear infinite; display: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  /* 居中播放/暂停大按钮 */
+  #centerBtn { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 60px; height: 60px; border-radius: 50%; background: rgba(0,0,0,.55); border: none; display: none; align-items: center; justify-content: center; cursor: pointer; }
+  #centerBtn svg { width: 30px; height: 30px; fill: #fff; }
+  /* 底部控制条 */
+  #controls { position: absolute; left: 0; right: 0; bottom: 0; height: 46px; padding: 0 8px; display: flex; align-items: center; background: linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,.72)); opacity: 0; transition: opacity .25s; }
+  #controls.show { opacity: 1; }
+  #playBtn { width: 34px; height: 34px; flex: none; border: none; background: none; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  #playBtn svg { width: 24px; height: 24px; fill: #fff; }
+  #time { color: #fff; font-size: 11px; margin: 0 8px; min-width: 86px; text-align: center; letter-spacing: .3px; }
+  #bar { flex: 1; height: 24px; display: flex; align-items: center; position: relative; cursor: pointer; touch-action: none; }
+  #track { width: 100%; height: 3px; background: rgba(255,255,255,.32); border-radius: 2px; }
+  #fill { position: absolute; left: 0; top: 50%; margin-top: -1.5px; height: 3px; background: #ff3b5c; border-radius: 2px; pointer-events: none; }
+  #thumb { position: absolute; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; background: #fff; border-radius: 50%; box-shadow: 0 0 4px rgba(0,0,0,.4); pointer-events: none; }
+  #fullBtn { width: 34px; height: 34px; flex: none; border: none; background: none; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  #fullBtn svg { width: 20px; height: 20px; fill: #fff; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <video id="video" playsinline webkit-playsinline></video>
+  <div id="spinner"></div>
+  <button id="centerBtn"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
+  <div id="controls">
+    <button id="playBtn"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
+    <span id="time">00:00 / 00:00</span>
+    <div id="bar">
+      <div id="track"></div>
+      <div id="fill"></div>
+      <div id="thumb"></div>
+    </div>
+    <button id="fullBtn"><svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg></button>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var video = document.getElementById("video");
+  var spinner = document.getElementById("spinner");
+  var centerBtn = document.getElementById("centerBtn");
+  var controls = document.getElementById("controls");
+  var playBtn = document.getElementById("playBtn");
+  var timeEl = document.getElementById("time");
+  var bar = document.getElementById("bar");
+  var fill = document.getElementById("fill");
+  var thumb = document.getElementById("thumb");
+  var fullBtn = document.getElementById("fullBtn");
+  var hls = null;
+  var currentUrl = "";
+  var loop = true;
+  var hideTimer = null;
+  var isDragging = false;
+
+  var PLAY_SVG = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+  var PAUSE_SVG = '<svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
+
+  function fmt(sec) {
+    sec = Math.max(0, Math.floor(sec || 0));
+    var m = Math.floor(sec / 60), s = sec % 60;
+    function p(n) { return (n < 10 ? "0" : "") + n; }
+    return p(m) + ":" + p(s);
+  }
+
+  function refreshUI() {
+    var dur = video.duration || 0;
+    var cur = video.currentTime || 0;
+    timeEl.textContent = fmt(cur) + " / " + fmt(dur);
+    var pct = dur > 0 ? (cur / dur * 100) : 0;
+    if (pct > 100) pct = 100;
+    fill.style.width = pct + "%";
+    thumb.style.left = pct + "%";
+  }
+
+  function showCenter(show) {
+    centerBtn.style.display = show ? "flex" : "none";
+    centerBtn.innerHTML = video.paused ? PLAY_SVG : PAUSE_SVG;
+  }
+
+  function updatePlayBtn() {
+    var playing = !video.paused && !video.ended;
+    playBtn.innerHTML = playing ? PAUSE_SVG : PLAY_SVG;
+    showCenter(false);
+    if (window.AndroidBridge) {
+      try { window.AndroidBridge.onState(playing); } catch (e) {}
+    }
+  }
+
+  function showControls(show) {
+    if (show) {
+      controls.classList.add("show");
+      scheduleHide();
+    } else {
+      controls.classList.remove("show");
+    }
+  }
+
+  function scheduleHide() {
+    if (hideTimer) clearTimeout(hideTimer);
+    hideTimer = setTimeout(function () { showControls(false); }, 3000);
+  }
+
+  function toggle() {
+    if (!video.src && !currentUrl) return;
+    if (video.paused || video.ended) {
+      video.play().then(function () { updatePlayBtn(); }).catch(function () {});
+    } else {
+      video.pause();
+      updatePlayBtn();
+    }
+    showControls(true);
+  }
+
+  function seekTo(sec) {
+    if (!isFinite(sec) || sec < 0) return;
+    var dur = video.duration || 0;
+    if (dur > 0 && sec > dur) sec = dur;
+    try { video.currentTime = sec; } catch (e) {}
+    refreshUI();
+  }
+
+  function onReady() {
+    var dur = video.duration || 0;
+    if (spinner) spinner.style.display = "none";
+    if (window.AndroidBridge) {
+      try { window.AndroidBridge.onReady(dur); } catch (e) {}
+    }
+    refreshUI();
+    showControls(true);
+  }
+
+  function onError() {
+    if (spinner) spinner.style.display = "none";
+    showCenter(true);
+    if (window.AndroidBridge) {
+      try { window.AndroidBridge.onError(); } catch (e) {}
+    }
+  }
+
+  function destroy() {
+    if (hls) { try { hls.destroy(); } catch (e) {} hls = null; }
+    try { video.removeAttribute("src"); video.load(); } catch (e) {}
+  }
+
+  function loadVideo(url, isLoop) {
+    url = String(url || "").trim();
+    if (!url) return;
+    loop = !!isLoop;
+    currentUrl = url;
+    destroy();
+    spinner.style.display = "block";
+    showCenter(false);
+
+    function startPlay() {
+      if (loop) video.loop = true;
+      video.play().then(function () { updatePlayBtn(); }).catch(function () { updatePlayBtn(); });
+    }
+
+    var isHls = /\.m3u8($|\?)/i.test(url);
+    if (isHls && window.Hls && Hls.isSupported()) {
+      hls = new Hls({ enableWorker: true });
+      hls.loadSource(url);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, function () { startPlay(); });
+      hls.on(Hls.Events.ERROR, function (e, data) {
+        if (data && data.fatal) onError();
+      });
+    } else {
+      video.src = url;
+      startPlay();
+    }
+  }
+
+  function loadHlsJs(url) {
+    url = String(url || "").trim();
+    if (!url) return;
+    if (/\.m3u8($|\?)/i.test(url) && !window.Hls) {
+      var s = document.createElement("script");
+      s.src = "https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js";
+      s.onload = function () { loadVideo(url, loop); };
+      s.onerror = function () { loadVideo(url, loop); };
+      document.head.appendChild(s);
+    } else {
+      loadVideo(url, loop);
+    }
+  }
+
+  // 对外接口
+  window.Player = {
+    loadVideo: loadVideo,
+    loadHlsJs: loadHlsJs,
+    toggle: toggle,
+    play: function () { if (video.src || currentUrl) video.play(); },
+    pause: function () { video.pause(); updatePlayBtn(); },
+    seekTo: seekTo,
+    getDuration: function () { return video.duration || 0; },
+    destroy: destroy
+  };
+
+  // 事件绑定
+  video.addEventListener("loadedmetadata", onReady);
+  video.addEventListener("durationchange", function () {
+    refreshUI();
+    // 时长变化（如 HLS 延迟确定）时同步给 Android，用于刷新“时间”标签
+    if (window.AndroidBridge) {
+      try { window.AndroidBridge.onReady(video.duration || 0); } catch (e) {}
+    }
+  });
+  video.addEventListener("timeupdate", refreshUI);
+  video.addEventListener("playing", function () { spinner.style.display = "none"; updatePlayBtn(); });
+  video.addEventListener("waiting", function () { spinner.style.display = "block"; });
+  video.addEventListener("pause", updatePlayBtn);
+  video.addEventListener("ended", function () {
+    updatePlayBtn();
+    showCenter(true);
+    if (window.AndroidBridge) { try { window.AndroidBridge.onEnd(); } catch (e) {} }
+  });
+  video.addEventListener("error", function () { if (!video.src) return; onError(); });
+  video.addEventListener("click", toggle);
+
+  // 控制条显隐
+  video.addEventListener("touchstart", function () { showControls(true); });
+  video.addEventListener("mousemove", function () { showControls(true); });
+  centerBtn.addEventListener("click", toggle);
+  playBtn.addEventListener("click", function (e) { e.stopPropagation(); toggle(); });
+  fullBtn.addEventListener("click", function (e) {
+    e.stopPropagation();
+    showControls(false);
+    if (window.AndroidBridge) { try { window.AndroidBridge.onFullscreen(); } catch (e) {} }
+  });
+
+  // 进度条拖动（Pointer Events）
+  function barPos(clientX) {
+    var r = bar.getBoundingClientRect();
+    var ratio = (clientX - r.left) / r.width;
+    if (ratio < 0) ratio = 0;
+    if (ratio > 1) ratio = 1;
+    return ratio;
+  }
+  bar.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    isDragging = true;
+    bar.setPointerCapture(e.pointerId);
+    seekTo(barPos(e.clientX) * (video.duration || 0));
+  });
+  bar.addEventListener("pointermove", function (e) {
+    if (!isDragging) return;
+    seekTo(barPos(e.clientX) * (video.duration || 0));
+  });
+  bar.addEventListener("pointerup", function (e) {
+    if (!isDragging) return;
+    isDragging = false;
+    seekTo(barPos(e.clientX) * (video.duration || 0));
+    showControls(true);
+  });
+  bar.addEventListener("pointercancel", function () { isDragging = false; });
+
+  showCenter(true);
+})();
+</script>
+</body>
+</html>

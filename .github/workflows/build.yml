@@ -1,0 +1,92 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Debug & Release APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Gradle 7.5
+        run: |
+          wget -q https://github.com/gradle/gradle/raw/master/gradle/wrapper/gradle-wrapper.jar -O /dev/null 2>/dev/null || true
+          cd /tmp
+          curl -sL "https://services.gradle.org/distributions/gradle-7.5-bin.zip" -o gradle.zip
+          unzip -qo gradle.zip -d /opt/
+          echo "/opt/gradle-7.5/bin" >> $GITHUB_PATH
+          echo "GRADLE_HOME=/opt/gradle-7.5" >> $GITHUB_ENV
+          gradle --version
+
+      - name: Setup Android SDK
+        run: |
+          echo "ANDROID_HOME=${ANDROID_HOME:-/usr/local/lib/android/sdk}" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=${ANDROID_HOME:-/usr/local/lib/android/sdk}" >> "$GITHUB_ENV"
+          if [ ! -f "${ANDROID_HOME:-/usr/local/lib/android/sdk}/cmdline-tools/latest/bin/sdkmanager" ]; then
+            cd /tmp
+            curl -sL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o cmdtools.zip
+            unzip -qo cmdtools.zip
+            mkdir -p "${ANDROID_HOME:-/usr/local/lib/android/sdk}/cmdline-tools/latest"
+            cp -r cmdline-tools/* "${ANDROID_HOME:-/usr/local/lib/android/sdk}/cmdline-tools/latest/"
+          fi
+          yes | "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+          "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" "platforms;android-33" "build-tools;33.0.0" "platform-tools"
+
+      - name: Build Debug APK
+        run: |
+          unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
+          gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Build Release APK (unsigned)
+        run: |
+          unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY
+          gradle assembleRelease --no-daemon --stacktrace
+        continue-on-error: true
+
+      - name: Upload Debug APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          if-no-files-found: warn
+          path: |
+            app/build/outputs/apk/debug/*.apk
+
+      - name: Upload Release APK artifacts
+        uses: actions/upload-artifact@v4
+        if: success() || failure()
+        with:
+          name: app-release
+          if-no-files-found: warn
+          path: |
+            app/build/outputs/apk/release/*.apk
+
+      - name: Create Downloadable Release
+        if: success() || failure()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.7-${{ github.run_number }}
+          name: APK v1.0.7 (Build #${{ github.run_number }})
+          body: |
+            ## Cloud-APP v1.0.7
+            Debug APK 可直接安装，Release APK 未签名。
+          files: |
+            app/build/outputs/apk/debug/*.apk
+            app/build/outputs/apk/release/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

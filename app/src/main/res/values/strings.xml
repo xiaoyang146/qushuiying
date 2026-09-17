@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">去水印</string>
+    <string name="paste_link">粘贴链接</string>
+    <string name="parse_video">解析视频</string>
+    <string name="input_hint">请输入短视频分享链接</string>
+    <string name="parsing">正在解析中…</string>
+    <string name="parse_success">解析成功</string>
+    <string name="parse_failed">解析失败</string>
+    <string name="save_video">保存视频</string>
+    <string name="play_video">播放视频</string>
+    <string name="saving">正在保存…</string>
+    <string name="save_success">保存成功</string>
+    <string name="save_failed">保存失败</string>
+    <string name="platform">平台</string>
+    <string name="author">作者</string>
+    <string name="supported_platforms">支持：抖音、快手、B站、微博、头条、皮皮虾、最右等</string>
+    <string name="my">我的</string>
+    <string name="history">解析历史</string>
+    <string name="saved">已保存视频</string>
+    <string name="settings">设置</string>
+    <string name="about">关于</string>
+    <string name="agreement_content">欢迎使用头大i去水印！
+
+一、服务内容
+本应用为用户提供短视频链接解析、去水印及保存服务。
+
+二、使用规范
+1. 您仅可将本应用用于个人学习、研究等合法用途；
+2. 不得利用本应用从事任何违法、侵权或危害他人权益的行为；
+3. 不得将解析获取的内容用于商业用途或未经授权传播。
+
+三、账号与设备
+本应用目前无需注册账号，请在下载及保存他人内容时，遵守相关平台的规则和法律法规。
+
+四、知识产权
+本应用自身代码、界面、标识的知识产权归开发者所有。您解析获取的原始内容版权归原发布者或权利人所有。
+
+五、协议变更
+我们可能适时更新本协议，更新后将在应用内公布，继续使用即视为接受更新后的协议。</string>
+    <string name="privacy_content">隐私协议
+
+一、信息收集
+本应用在进行视频解析与保存功能时，不会收集您的个人身份信息。您在应用内粘贴的链接仅用于本次解析请求，解析完成后不在云端留存。
+
+二、信息使用
+我们不会将任何用户数据用于画像、广告定向或第三方共享。应用仅使用必要的设备权限（如存储权限）以实现保存视频的功能。
+
+三、权限说明
+1. 存储权限：用于将解析后的视频保存到您的设备本地；
+2. 网络权限：用于访问短视频平台完成解析和检测更新。
+
+四、信息保护
+我们已采取合理的安全措施保护您的数据安全，但请您注意，任何通过网络传输的数据都无法保证绝对安全。
+
+五、协议更新
+本协议如有更新，我们将在应用内公布更新后的内容。</string>
+    <string name="disclaimer_content">免责声明
+
+一、用途说明
+头大i去水印仅供用户用于个人学习、研究与合理使用，帮助用户便捷保存自己可合法访问的内容。
+
+二、版权责任
+应用内解析获取的原始内容的版权归原权利人所有。用户下载或保存的内容，所涉及的全部法律责任由用户自行承担，请务必尊重并遵守相关平台规则与版权法律法规。
+
+三、侵权投诉
+如任何权利持有人认为本应用展示或解析的内容侵犯了其合法权益，可联系开发者，我们将在核实后依法配合处理。
+
+四、适用法律
+因使用本应用产生的争议，适用中华人民共和国法律。
+
+五、其他
+本免责声明内容如有更新，恕不另行通知，请在应用内查看最新版本。</string>
+</resources>
