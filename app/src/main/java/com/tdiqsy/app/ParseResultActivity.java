@@ -195,15 +195,15 @@ public class ParseResultActivity extends AppCompatActivity {
     private void setupQualitySpinner(VideoInfo info) {
         qualityLabels.clear();
         currentQualityIndex = 0;
-        if (info.qualityItems != null && !info.qualityItems.isEmpty()) {
-            for (VideoInfo.QualityItem q : info.qualityItems) {
-                qualityLabels.add(q.label);
-            }
-            spinnerQuality.setText(qualityLabels.get(0));
-            layoutQuality.setVisibility(View.VISIBLE);
-        } else {
+        if (info.qualityOptions == null || info.qualityOptions.size() <= 1) {
             layoutQuality.setVisibility(View.GONE);
+            return;
         }
+        for (int i = 0; i < info.qualityOptions.size(); i++) {
+            qualityLabels.add(resolutionLabel(info.qualityOptions.get(i), i));
+        }
+        spinnerQuality.setText(qualityLabels.get(0));
+        layoutQuality.setVisibility(View.VISIBLE);
     }
 
     private void showQualityDialog() {
@@ -211,13 +211,10 @@ public class ParseResultActivity extends AppCompatActivity {
         new AlertDialog.Builder(this)
                 .setTitle("选择清晰度")
                 .setItems(qualityLabels.toArray(new String[0]), (dialog, which) -> {
-                    if (currentVideo != null && currentVideo.qualityItems != null && which < currentVideo.qualityItems.size()) {
+                    if (currentVideo != null && currentVideo.qualityOptions != null && which < currentVideo.qualityOptions.size()) {
                         currentQualityIndex = which;
                         spinnerQuality.setText(qualityLabels.get(which));
-                        VideoInfo.QualityItem q = currentVideo.qualityItems.get(which);
-                        currentVideo.videoUrl = q.url;
-                        currentVideo.sizeMb = q.size;
-                        currentVideo.format = q.format;
+                        currentVideo.videoUrl = currentVideo.qualityOptions.get(which);
                         refreshActualVideoSize(currentVideo);
                     }
                 })
@@ -467,6 +464,23 @@ public class ParseResultActivity extends AppCompatActivity {
         if (r >= 12 && h[0] == 'R' && h[1] == 'I' && h[2] == 'F' && h[3] == 'F'
                 && h[8] == 'W' && h[9] == 'E' && h[10] == 'B' && h[11] == 'P') return ".webp";
         return ".jpg";
+    }
+
+    private String resolutionLabel(String url, int index) {
+        String u = (url == null ? "" : url).toLowerCase();
+        if (u.contains("4k") || u.contains("2160") || u.contains("3840") || u.contains("uhd")) return "4K";
+        if (u.contains("1080") || u.contains("1920") || u.contains("fhd") || u.contains("fullhd")) return "1080P";
+        if (u.contains("720") || u.contains("1280")) return "720P";
+        if (u.contains("960") || u.contains("540")) return "540P";
+        if (u.contains("480") || u.contains("640")) return "480P";
+        if (u.contains("360")) return "360P";
+        if (u.contains("240")) return "240P";
+        if (u.contains("144")) return "144P";
+        if (u.contains("原画") || u.contains("source") || u.contains("无损")) return "原画 " + (index + 1);
+        if (u.contains("高清") || u.contains("hd")) return "高清 " + (index + 1);
+        if (u.contains("标清") || u.contains("sd")) return "标清 " + (index + 1);
+        if (u.contains("流畅") || u.contains("low")) return "流畅 " + (index + 1);
+        return "清晰度 " + (index + 1);
     }
 
     private void copyToClipboard(String text, String toast) {
