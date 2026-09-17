@@ -19,7 +19,7 @@
             android:id="@+id/ivAppIcon"
             android:layout_width="104dp"
             android:layout_height="104dp"
-            android:src="@mipmap/ic_launcher"
+            android:src="@drawable/ic_launcher_foreground"
             android:alpha="0.0" />
 
         <!-- 应用名称 -->
