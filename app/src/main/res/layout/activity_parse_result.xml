@@ -25,21 +25,11 @@
             android:background="@color/white"
             android:elevation="1dp">
 
-            <ImageView
-                android:id="@+id/btnBack"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:src="@drawable/ic_back"
-                android:padding="4dp"
-                android:clickable="true"
-                android:focusable="true"
-                android:background="?attr/selectableItemBackgroundBorderless" />
-
             <TextView
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:layout_marginStart="8dp"
+                android:gravity="center"
                 android:text="解析结果"
                 android:textSize="20sp"
                 android:textColor="@color/black"

@@ -36,7 +36,6 @@ public class ParseResultActivity extends AppCompatActivity {
     public static final String EXTRA_VIDEO = "extra_video";
     public static final String EXTRA_SOURCE_URL = "extra_source_url";
 
-    private ImageView btnBack;
     private MaterialCardView cardResult;
     private ImageView ivCover;
     private WebView videoView;
@@ -105,7 +104,6 @@ public class ParseResultActivity extends AppCompatActivity {
     }
 
     private void initViews() {
-        btnBack = findViewById(R.id.btnBack);
         cardResult = findViewById(R.id.cardResult);
         ivCover = findViewById(R.id.ivCover);
         videoView = findViewById(R.id.videoView);
@@ -134,10 +132,6 @@ public class ParseResultActivity extends AppCompatActivity {
     }
 
     private void initListeners() {
-        if (btnBack != null) {
-            btnBack.setOnClickListener(v -> finish());
-        }
-
         btnPlay.setOnClickListener(v -> {
             if (currentVideo != null) {
                 if (currentVideo.isLive() && currentVideo.livePhotos != null && !currentVideo.livePhotos.isEmpty()) {
