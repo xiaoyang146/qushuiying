@@ -48,14 +48,15 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="16dp">
+                android:paddingHorizontal="16dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="16dp">
 
                 <!-- 解析结果区域 -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/cardResult"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
                     app:cardCornerRadius="12dp"
                     app:cardElevation="0dp"
                     android:visibility="gone">
