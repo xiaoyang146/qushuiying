@@ -29,7 +29,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:gravity="center"
+                android:gravity="start|center_vertical"
                 android:text="解析结果"
                 android:textSize="20sp"
                 android:textColor="@color/black"
@@ -85,7 +85,8 @@
                                 android:layout_width="296dp"
                                 android:layout_height="200dp"
                                 android:layout_gravity="center"
-                                android:background="@drawable/bg_cover">
+                                android:background="@drawable/bg_media_stage"
+                                android:clipToOutline="true">
 
                                 <ImageView
                                     android:id="@+id/ivCover"
@@ -193,6 +194,49 @@
                                     android:background="@drawable/bg_time_label"
                                     android:paddingHorizontal="6dp"
                                     android:paddingVertical="2dp"
+                                    android:visibility="gone" />
+
+                                <!-- 动态图角标 -->
+                                <TextView
+                                    android:id="@+id/tvLiveBadge"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_gravity="top|start"
+                                    android:layout_margin="10dp"
+                                    android:background="@drawable/bg_live_badge"
+                                    android:paddingHorizontal="9dp"
+                                    android:paddingVertical="3dp"
+                                    android:text="LIVE 动态图"
+                                    android:textColor="@color/white"
+                                    android:textSize="10sp"
+                                    android:textStyle="bold"
+                                    android:visibility="gone" />
+
+                                <!-- 页码（如 1 / 5） -->
+                                <TextView
+                                    android:id="@+id/tvPageCounter"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_gravity="top|end"
+                                    android:layout_margin="8dp"
+                                    android:layout_marginTop="10dp"
+                                    android:text=""
+                                    android:textSize="11sp"
+                                    android:textColor="@color/white"
+                                    android:background="@drawable/bg_time_label"
+                                    android:paddingHorizontal="6dp"
+                                    android:paddingVertical="2dp"
+                                    android:visibility="gone" />
+
+                                <!-- 分页指示点 -->
+                                <LinearLayout
+                                    android:id="@+id/pageDots"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_gravity="bottom|center_horizontal"
+                                    android:layout_marginBottom="12dp"
+                                    android:gravity="center"
+                                    android:orientation="horizontal"
                                     android:visibility="gone" />
                             </FrameLayout>
                         </FrameLayout>

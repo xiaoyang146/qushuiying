@@ -5,11 +5,15 @@ import android.content.ClipboardManager;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.graphics.SurfaceTexture;
+import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.Gravity;
+import android.view.Surface;
+import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
@@ -55,6 +59,17 @@ public class ParseResultActivity extends AppCompatActivity {
     private HorizontalScrollView imageScroll;
     private LinearLayout imageStrip;
     private ViewPager imagePager;
+    private FrameLayout videoContainer;
+    private LinearLayout pageDots;
+    private TextView tvLiveBadge;
+    private TextView tvPageCounter;
+
+    // 动态图分页适配器（TextureView 播放，滑动更顺滑、无遮挡）
+    private LivePagerAdapter livePagerAdapter;
+    // 分页指示：当前总页数
+    private int chromeCount = 0;
+    // 动态图舞台是否已按首图比例自适应
+    private boolean liveStageSized = false;
 
     // 全屏相关
     private FrameLayout fullscreenOverlay;
@@ -123,6 +138,10 @@ public class ParseResultActivity extends AppCompatActivity {
         imageScroll = findViewById(R.id.imageScroll);
         imageStrip = findViewById(R.id.imageStrip);
         imagePager = findViewById(R.id.imagePager);
+        videoContainer = findViewById(R.id.videoContainer);
+        pageDots = findViewById(R.id.pageDots);
+        tvLiveBadge = findViewById(R.id.tvLiveBadge);
+        tvPageCounter = findViewById(R.id.tvPageCounter);
 
         fullscreenOverlay = findViewById(R.id.fullscreenOverlay);
         btnFullscreenExit = findViewById(R.id.btnFullscreenExit);
@@ -176,6 +195,30 @@ public class ParseResultActivity extends AppCompatActivity {
         });
 
         spinnerQuality.setOnClickListener(v -> showQualityDialog());
+
+        // 画廊/动态图分页监听（常驻，避免重复添加）
+        imagePager.addOnPageChangeListener(new ViewPager.SimpleOnPageChangeListener() {
+            @Override
+            public void onPageSelected(int position) {
+                onPagerPageSelected(position);
+            }
+        });
+    }
+
+    /** 画廊翻页：动态图自动播放当前页、更新指示点与缩略图高亮 */
+    private void onPagerPageSelected(int position) {
+        updatePageChrome(position);
+        highlightStrip(position);
+        if (currentVideo != null && currentVideo.isLive() && livePagerAdapter != null) {
+            livePagerAdapter.setActive(position);
+        }
+        // 缩略图条跟随滚动
+        if (imageStrip != null && position >= 0 && position < imageStrip.getChildCount()) {
+            View t = imageStrip.getChildAt(position);
+            if (imageScroll != null) {
+                imageScroll.smoothScrollTo(Math.max(0, t.getLeft() - dp(8)), 0);
+            }
+        }
     }
 
     /** 初始化 HTML5 播放器 WebView，并注册 JS 桥接 */
@@ -358,8 +401,19 @@ public class ParseResultActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
+        if (livePagerAdapter != null) livePagerAdapter.pauseAll();
         if (isVideoPlaying) pauseVideo();
         if (isFullscreen) exitFullscreen();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // 回到页面时恢复当前动态图的播放
+        if (livePagerAdapter != null && imagePager != null
+                && imagePager.getVisibility() == View.VISIBLE) {
+            livePagerAdapter.setActive(imagePager.getCurrentItem());
+        }
     }
 
     @Override
@@ -443,28 +497,33 @@ public class ParseResultActivity extends AppCompatActivity {
             btnPlay.setVisibility(View.GONE);
             tvVideoInfo.setVisibility(View.GONE);
             tvFullscreenInfo.setVisibility(View.GONE);
+            hideLiveBadge();
+            restoreStageSize();
             setupImagePager(info);
             return;
         }
 
         if (info.isLive()) {
-            // ── 封面位置直接展示动态图 ViewPager：每页一个 VideoView 自动循环播放 ──
+            // ── 动态图：全宽圆角舞台 + ViewPager 左右滑动，当前页自动播放 ──
             ivCover.setVisibility(View.GONE);
             btnPlay.setVisibility(View.GONE);
             videoView.setVisibility(View.GONE);
+            tvVideoInfo.setVisibility(View.GONE);
+            tvFullscreenInfo.setVisibility(View.GONE);
+            layoutQuality.setVisibility(View.GONE);
+            btnSave.setText("保存动态图");
             imageScroll.setVisibility(View.VISIBLE);
             imageStrip.removeAllViews();
             loadImageStrip(info);
-            btnSave.setText("长按图片保存");
-            layoutQuality.setVisibility(View.GONE);
-            tvVideoInfo.setVisibility(View.GONE);
-            tvFullscreenInfo.setVisibility(View.GONE);
-            // 主预览：ViewPager 每页一个 VideoView 播放动态视频
+            applyLiveStageSize(4f / 3f);
             setupLivePager(info);
             return;
         }
 
         // ── 视频内容 ──
+        hidePageChrome();
+        hideLiveBadge();
+        restoreStageSize();
         imageScroll.setVisibility(View.GONE);
         imageStrip.removeAllViews();
         imagePager.setVisibility(View.GONE);
@@ -719,7 +778,7 @@ public class ParseResultActivity extends AppCompatActivity {
             lp.setMargins(0, 0, (int) (6 * getResources().getDisplayMetrics().density), 0);
             thumb.setLayoutParams(lp);
             thumb.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            thumb.setBackgroundResource(R.drawable.bg_cover);
+            thumb.setBackgroundResource(R.drawable.bg_thumb);
             final int idx = i;
             thumb.setOnClickListener(v -> viewImageFullscreen(idx, info.imageUrls));
             thumb.setOnLongClickListener(v -> {
@@ -742,52 +801,167 @@ public class ParseResultActivity extends AppCompatActivity {
         }
     }
 
-    /** 主预览画廊：左右滑动切换、点击放大、长按保存 */
-
-    /** 实况图主展示：封面位置 ViewPager 每页一个 VideoView 播放动态视频 */
+    /** 动态图主展示：全宽圆角舞台 + 左右滑动切换，当前页自动播放动态片段 */
     private void setupLivePager(VideoInfo info) {
         if (info.livePhotos == null || info.livePhotos.isEmpty()) {
+            livePagerAdapter = null;
+            hidePageChrome();
+            hideLiveBadge();
             imagePager.setVisibility(View.GONE);
             return;
         }
-        // 防止 VideoView 溢出 ViewPager 边界（穿布局）
+        final int count = info.livePhotos.size();
+        liveStageSized = false;
+        // 防止视频画面溢出 ViewPager / 圆角舞台
         imagePager.setClipChildren(true);
         imagePager.setClipToPadding(true);
-        imagePager.setAdapter(new LivePagerAdapter(info,
-                () -> saveMediaByIndex(imagePager.getCurrentItem(), null)));
-        // 缩略图点击切换到对应页
+        imagePager.setOffscreenPageLimit(1);
+        livePagerAdapter = new LivePagerAdapter(info,
+                () -> saveMediaByIndex(imagePager.getCurrentItem(), null));
+        imagePager.setAdapter(livePagerAdapter);
+        imagePager.setPageTransformer(false, new FadeScaleTransformer());
+        // 缩略图点击切换到对应页（仅前 count 张属于动态图）
         for (int i = 0; i < imageStrip.getChildCount(); i++) {
             final int idx = i;
             View thumb = imageStrip.getChildAt(i);
-            thumb.setOnClickListener(v -> imagePager.setCurrentItem(idx, true));
+            if (idx < count) {
+                thumb.setOnClickListener(v -> imagePager.setCurrentItem(idx, true));
+            } else {
+                thumb.setAlpha(0.45f);
+            }
         }
-        imagePager.setCurrentItem(0);
+        showPageChrome(count, 0);
+        highlightStrip(0);
+        tvLiveBadge.setVisibility(View.VISIBLE);
+        imagePager.setCurrentItem(0, false);
         imagePager.setVisibility(View.VISIBLE);
+        livePagerAdapter.setActive(0);
     }
 
     private void setupImagePager(VideoInfo info) {
         final java.util.List<String> urls = info.imageUrls;
         if (urls == null || urls.isEmpty()) {
+            hidePageChrome();
             imagePager.setVisibility(View.GONE);
             return;
         }
         imagePager.setAdapter(new ImagePagerAdapter(urls, false,
                 () -> viewImageFullscreen(imagePager.getCurrentItem(), urls),
                 () -> saveMediaByIndex(imagePager.getCurrentItem(), null)));
-        imagePager.addOnPageChangeListener(new ViewPager.OnPageChangeListener() {
-            @Override public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {}
-            @Override public void onPageSelected(int position) {
-                // 动态图内容：滑动到第几张就自动播放该张的动态视频（对应播放整段）
-                if (currentVideo != null && currentVideo.isLive()
-                        && currentVideo.livePhotos != null && !currentVideo.livePhotos.isEmpty()) {
-                    pauseVideo();
-                    playLiveAt(position);
-                }
-            }
-            @Override public void onPageScrollStateChanged(int state) {}
-        });
-        imagePager.setCurrentItem(0);
+        imagePager.setPageTransformer(false, new FadeScaleTransformer());
+        showPageChrome(urls.size(), 0);
+        highlightStrip(0);
+        imagePager.setCurrentItem(0, false);
         imagePager.setVisibility(View.VISIBLE);
+    }
+
+    // ── 舞台尺寸 / 分页指示 / 缩略图高亮 等美化辅助 ──────────────
+
+    private int dp(float value) {
+        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    /** 动态图舞台：全宽 + 按比例自适应高度（ratio = 高 / 宽） */
+    private void applyLiveStageSize(float ratio) {
+        if (videoContainer == null) return;
+        int w = getResources().getDisplayMetrics().widthPixels - dp(64);
+        float r = ratio;
+        if (r < 0.66f) r = 0.66f;
+        if (r > 1.78f) r = 1.78f;
+        int h = Math.round(w * r);
+        int max = Math.round(getResources().getDisplayMetrics().heightPixels * 0.60f);
+        if (h > max) h = max;
+        videoContainer.setLayoutParams(new FrameLayout.LayoutParams(w, h, Gravity.CENTER));
+    }
+
+    /** 视频模式恢复原本的 296dp × 200dp 封面尺寸 */
+    private void restoreStageSize() {
+        if (videoContainer == null) return;
+        videoContainer.setLayoutParams(new FrameLayout.LayoutParams(dp(296), dp(200), Gravity.CENTER));
+    }
+
+    /** 构建分页指示点 + 页码 */
+    private void showPageChrome(int count, int active) {
+        if (pageDots == null) return;
+        chromeCount = count;
+        pageDots.removeAllViews();
+        if (count > 1 && count <= 10) {
+            for (int i = 0; i < count; i++) {
+                View dot = new View(this);
+                int size = dp(6);
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(size, size);
+                lp.setMargins(dp(3), 0, dp(3), 0);
+                dot.setLayoutParams(lp);
+                dot.setBackgroundResource(
+                        i == active ? R.drawable.bg_dot_active : R.drawable.bg_dot_inactive);
+                pageDots.addView(dot);
+            }
+            pageDots.setVisibility(View.VISIBLE);
+        } else {
+            pageDots.setVisibility(View.GONE);
+        }
+        updatePageChrome(active);
+    }
+
+    /** 只刷新选中态，避免每次翻页重建视图 */
+    private void updatePageChrome(int active) {
+        if (tvPageCounter != null) {
+            if (chromeCount > 1) {
+                tvPageCounter.setText((active + 1) + " / " + chromeCount);
+                tvPageCounter.setVisibility(View.VISIBLE);
+            } else {
+                tvPageCounter.setVisibility(View.GONE);
+            }
+        }
+        if (pageDots != null) {
+            for (int i = 0; i < pageDots.getChildCount(); i++) {
+                pageDots.getChildAt(i).setBackgroundResource(
+                        i == active ? R.drawable.bg_dot_active : R.drawable.bg_dot_inactive);
+            }
+        }
+    }
+
+    private void hidePageChrome() {
+        chromeCount = 0;
+        if (pageDots != null) {
+            pageDots.removeAllViews();
+            pageDots.setVisibility(View.GONE);
+        }
+        if (tvPageCounter != null) {
+            tvPageCounter.setVisibility(View.GONE);
+        }
+    }
+
+    private void hideLiveBadge() {
+        if (tvLiveBadge != null) tvLiveBadge.setVisibility(View.GONE);
+    }
+
+    /** 缩略图高亮：当前查看的那张描边高亮 */
+    private void highlightStrip(int active) {
+        if (imageStrip == null) return;
+        for (int i = 0; i < imageStrip.getChildCount(); i++) {
+            View v = imageStrip.getChildAt(i);
+            if (v.getAlpha() < 0.5f) continue;  // 非动态图的静态补充图保持弱化
+            v.setBackgroundResource(i == active ? R.drawable.bg_thumb_active : R.drawable.bg_thumb);
+        }
+    }
+
+    /** 翻页时轻微淡入淡出 + 缩放，滑动更顺滑 */
+    private class FadeScaleTransformer implements ViewPager.PageTransformer {
+        @Override
+        public void transformPage(View page, float position) {
+            float abs = Math.abs(position);
+            if (abs >= 1f) {
+                page.setAlpha(1f);
+                page.setScaleX(1f);
+                page.setScaleY(1f);
+            } else {
+                page.setAlpha(1f - 0.30f * abs);
+                float scale = 1f - 0.05f * abs;
+                page.setScaleX(scale);
+                page.setScaleY(scale);
+            }
+        }
     }
 
     /** 全屏查看图片：左右滑动切换、双指缩放、点击隐藏/显示工具条、长按保存 */
@@ -1091,13 +1265,25 @@ public class ParseResultActivity extends AppCompatActivity {
     }
 
     /** 实况图分页适配器：每页一个 VideoView 自动循环播放动态图视频 */
+    /** 动态图分页适配器：TextureView + MediaPlayer，圆角舞台内播放、左右切换顺滑 */
     private class LivePagerAdapter extends PagerAdapter {
+
         private final VideoInfo info;
         private final Runnable onSave;
+        private final android.util.SparseArray<Holder> holders = new android.util.SparseArray<>();
+        private int activeIndex = 0;
 
         LivePagerAdapter(VideoInfo info, Runnable onSave) {
             this.info = info;
             this.onSave = onSave;
+        }
+
+        class Holder {
+            int position;
+            ImageView preview;
+            TextureView texture;
+            MediaPlayer player;
+            boolean prepared;
         }
 
         @Override
@@ -1110,77 +1296,213 @@ public class ParseResultActivity extends AppCompatActivity {
 
         @Override
         public Object instantiateItem(ViewGroup container, int position) {
-            VideoInfo.LivePhotoItem item = info.livePhotos.get(position);
+            final VideoInfo.LivePhotoItem item = info.livePhotos.get(position);
+            final Holder h = new Holder();
+            h.position = position;
 
             FrameLayout frame = new FrameLayout(ParseResultActivity.this);
             frame.setLayoutParams(new ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT));
+            frame.setBackgroundColor(0xFF0E1116);
 
-            // 静态预览图作为占位
+            // 静态预览图（视频未就绪时占位）
             ImageView preview = new ImageView(ParseResultActivity.this);
             preview.setLayoutParams(new FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT));
             preview.setScaleType(ImageView.ScaleType.FIT_CENTER);
             frame.addView(preview);
+            h.preview = preview;
 
-            // 异步加载预览图
+            // 动态视频画面（TextureView 可被圆角裁剪，滑动时不穿层）
+            TextureView texture = new TextureView(ParseResultActivity.this);
+            texture.setLayoutParams(new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    Gravity.CENTER));
+            h.texture = texture;
+            texture.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
+                @Override
+                public void onSurfaceTextureAvailable(SurfaceTexture st, int width, int height) {
+                    startPlayback(h, st);
+                }
+
+                @Override
+                public void onSurfaceTextureSizeChanged(SurfaceTexture st, int width, int height) {}
+
+                @Override
+                public boolean onSurfaceTextureDestroyed(SurfaceTexture st) {
+                    releasePlayer(h);
+                    return true;
+                }
+
+                @Override
+                public void onSurfaceTextureUpdated(SurfaceTexture st) {}
+            });
+            frame.addView(texture);
+
+            // 异步加载预览图，并按首图比例自适应舞台高度
             final String imgUrl = item.imageUrl;
-            executor.execute(() -> {
+            if (imgUrl != null && !imgUrl.isEmpty()) {
+                executor.execute(() -> {
+                    try {
+                        final android.graphics.Bitmap bmp = loadImageSampled(imgUrl, 900, 1600);
+                        if (bmp != null) {
+                            mainHandler.post(() -> {
+                                h.preview.setImageBitmap(bmp);
+                                if (h.position == 0 && !liveStageSized && bmp.getWidth() > 0) {
+                                    liveStageSized = true;
+                                    applyLiveStageSize((float) bmp.getHeight() / bmp.getWidth());
+                                }
+                            });
+                        }
+                    } catch (Exception ignored) {}
+                });
+            }
+
+            // 单击暂停/继续，长按保存当前动态图
+            frame.setOnClickListener(v -> {
+                if (h.player == null || !h.prepared) return;
                 try {
-                    android.graphics.Bitmap bmp = loadImageSampled(imgUrl, 720, 1280);
-                    if (bmp != null) {
-                        mainHandler.post(() -> preview.setImageBitmap(bmp));
+                    if (h.player.isPlaying()) {
+                        h.player.pause();
+                    } else {
+                        h.player.start();
                     }
                 } catch (Exception ignored) {}
             });
-
-            // 动态视频播放器
-            VideoView vv = new VideoView(ParseResultActivity.this);
-            FrameLayout.LayoutParams vp = new FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    Gravity.CENTER);
-            vv.setLayoutParams(vp);
-            vv.setZOrderOnTop(true);
-
-            try {
-                if (item.videoUrl != null && !item.videoUrl.isEmpty()) {
-                    vv.setVideoURI(Uri.parse(item.videoUrl));
-                }
-            } catch (Exception ignored) {}
-
-            vv.setOnPreparedListener(mp -> {
-                mp.setLooping(true);
-                preview.setVisibility(View.GONE);  // 视频就绪，隐藏预览图
-                vv.start();
-            });
-
-            vv.setOnErrorListener((mp, what, extra) -> true);
-
-            frame.addView(vv);
-
-            // 点击保存当前动态图
             frame.setOnLongClickListener(v -> {
                 if (onSave != null) onSave.run();
                 return true;
             });
 
             container.addView(frame);
+            holders.put(position, h);
+            if (position == activeIndex) {
+                h.texture.post(() -> applyActiveState(h));
+            }
             return frame;
+        }
+
+        /** 当前页播放（带声音），其它页暂停并静音 */
+        void setActive(int position) {
+            activeIndex = position;
+            for (int i = 0; i < holders.size(); i++) {
+                applyActiveState(holders.valueAt(i));
+            }
+        }
+
+        void pauseAll() {
+            for (int i = 0; i < holders.size(); i++) {
+                Holder h = holders.valueAt(i);
+                if (h.player == null) continue;
+                try {
+                    if (h.player.isPlaying()) h.player.pause();
+                } catch (Exception ignored) {}
+            }
+        }
+
+        void releaseAll() {
+            for (int i = 0; i < holders.size(); i++) {
+                releasePlayer(holders.valueAt(i));
+            }
+            holders.clear();
+        }
+
+        private void applyActiveState(Holder h) {
+            if (h.player == null || !h.prepared) return;
+            try {
+                if (h.position == activeIndex) {
+                    h.preview.setVisibility(View.GONE);
+                    h.player.setVolume(1f, 1f);
+                    if (!h.player.isPlaying()) h.player.start();
+                } else {
+                    h.player.setVolume(0f, 0f);
+                    if (h.player.isPlaying()) h.player.pause();
+                }
+            } catch (Exception ignored) {}
+        }
+
+        private void startPlayback(Holder h, SurfaceTexture st) {
+            if (h.player != null || info.livePhotos == null
+                    || h.position < 0 || h.position >= info.livePhotos.size()) return;
+            VideoInfo.LivePhotoItem item = info.livePhotos.get(h.position);
+            if (item.videoUrl == null || item.videoUrl.isEmpty()) {
+                h.preview.setVisibility(View.VISIBLE);
+                return;
+            }
+            try {
+                MediaPlayer mp = new MediaPlayer();
+                mp.setDataSource(item.videoUrl);
+                mp.setSurface(new Surface(st));
+                mp.setLooping(true);
+                mp.setVolume(0f, 0f);
+                mp.setOnPreparedListener(p -> {
+                    h.prepared = true;
+                    applyActiveState(h);
+                });
+                mp.setOnVideoSizeChangedListener((p, vw, vh) -> fitTexture(h, vw, vh));
+                mp.setOnErrorListener((p, what, extra) -> {
+                    h.prepared = false;
+                    h.preview.setVisibility(View.VISIBLE);
+                    return true;
+                });
+                mp.prepareAsync();
+                h.player = mp;
+            } catch (Exception e) {
+                h.preview.setVisibility(View.VISIBLE);
+            }
+        }
+
+        /** 按视频比例缩放画面，避免拉伸变形 */
+        private void fitTexture(Holder h, int videoWidth, int videoHeight) {
+            if (videoWidth <= 0 || videoHeight <= 0) return;
+            View parent = (View) h.texture.getParent();
+            if (parent == null || parent.getWidth() <= 0 || parent.getHeight() <= 0) return;
+            float vr = (float) videoWidth / (float) videoHeight;
+            float pr = (float) parent.getWidth() / (float) parent.getHeight();
+            int w;
+            int hh;
+            if (vr > pr) {
+                w = parent.getWidth();
+                hh = Math.round(w / vr);
+            } else {
+                hh = parent.getHeight();
+                w = Math.round(hh * vr);
+            }
+            h.texture.setLayoutParams(new FrameLayout.LayoutParams(w, hh, Gravity.CENTER));
+        }
+
+        private void releasePlayer(Holder h) {
+            if (h.player != null) {
+                try {
+                    if (h.prepared) h.player.stop();
+                } catch (Exception ignored) {}
+                try {
+                    h.player.setSurface(null);
+                } catch (Exception ignored) {}
+                try {
+                    h.player.reset();
+                } catch (Exception ignored) {}
+                try {
+                    h.player.release();
+                } catch (Exception ignored) {}
+                h.player = null;
+            }
+            h.prepared = false;
         }
 
         @Override
         public void destroyItem(ViewGroup container, int position, Object object) {
-            FrameLayout frame = (FrameLayout) object;
-            for (int i = 0; i < frame.getChildCount(); i++) {
-                View child = frame.getChildAt(i);
-                if (child instanceof VideoView) {
-                    ((VideoView) child).stopPlayback();
-                }
+            Holder h = holders.get(position);
+            if (h != null) {
+                releasePlayer(h);
+                holders.remove(position);
             }
-            container.removeView(frame);
+            if (object instanceof View) {
+                container.removeView((View) object);
+            }
         }
     }
 
@@ -1699,6 +2021,10 @@ public class ParseResultActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        if (livePagerAdapter != null) {
+            livePagerAdapter.releaseAll();
+            livePagerAdapter = null;
+        }
         executor.shutdown();
         if (videoView != null) {
             try {
