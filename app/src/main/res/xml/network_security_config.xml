@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- 默认禁止明文流量，仅允许系统信任锚 -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- 业务后台域名：仅 HTTPS（ok1666.cn 及其子域） -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">ok1666.cn</domain>
+        <domain includeSubdomains="true">api.bugpk.com</domain>
+        <domain includeSubdomains="true">svproxy.168299.xyz</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>

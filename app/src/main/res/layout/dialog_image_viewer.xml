@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/black">
+
+    <!-- 图片翻页（左右滑动切换，每页支持双指缩放） -->
+    <androidx.viewpager.widget.ViewPager
+        android:id="@+id/viewerPager"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- 顶部：计数器 + 关闭 -->
+    <LinearLayout
+        android:id="@+id/viewerTopBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp"
+        android:background="@drawable/bg_viewer_top">
+
+        <TextView
+            android:id="@+id/viewerCounter"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="1/1"
+            android:textSize="15sp"
+            android:textColor="@android:color/white" />
+
+        <ImageView
+            android:id="@+id/viewerClose"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_close"
+            android:padding="10dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="关闭" />
+    </LinearLayout>
+
+    <!-- 底部：提示 + 保存按钮 -->
+    <LinearLayout
+        android:id="@+id/viewerBottomBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="16dp"
+        android:paddingBottom="18dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="长按图片可保存"
+            android:textColor="#CCFFFFFF"
+            android:textSize="13sp" />
+
+        <Button
+            android:id="@+id/viewerSave"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:minWidth="110dp"
+            android:backgroundTint="@color/primary"
+            android:text="保存图片"
+            android:textColor="@color/white"
+            android:textSize="14sp" />
+    </LinearLayout>
+</FrameLayout>

@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@color/white">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:paddingHorizontal="20dp"
+        android:text="选择视频源"
+        android:gravity="center"
+        android:textSize="16sp"
+        android:textColor="@color/text_primary"
+        android:textStyle="bold" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="14dp"
+        android:background="@color/divider" />
+
+    <!-- 清晰度选项列表（由代码动态填充，每个选项文本垂直居中） -->
+    <LinearLayout
+        android:id="@+id/qualityList"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="14dp"
+        android:background="@color/divider" />
+
+    <TextView
+        android:id="@+id/btnQualityCancel"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:gravity="center"
+        android:text="取消"
+        android:textSize="15sp"
+        android:textColor="@color/text_secondary"
+        android:clickable="true"
+        android:focusable="true"
+        android:background="?attr/selectableItemBackground" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="24dp" />
+</LinearLayout>
